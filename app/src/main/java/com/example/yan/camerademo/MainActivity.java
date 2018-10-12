@@ -16,21 +16,25 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Size;
+import android.util.SparseIntArray;
 import android.view.Surface;
 
 import android.view.TextureView;
+import android.view.View;
+import android.widget.Button;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements TextureView.SurfaceTextureListener {
 
     private Handler mHandler = new Handler();
     private TextureView mTextureView;
@@ -42,42 +46,100 @@ public class MainActivity extends AppCompatActivity {
     private CameraCaptureSession mPreviewSerssion;
     private CaptureRequest mCaptureRequest;
 
+    //方向取向
+    private static final SparseIntArray ORIENTATION = new SparseIntArray();
+
+    static {
+        ORIENTATION.append(Surface.ROTATION_0, 90);
+        ORIENTATION.append(Surface.ROTATION_90, 0);
+        ORIENTATION.append(Surface.ROTATION_180, 270);
+        ORIENTATION.append(Surface.ROTATION_270, 180);
+    }
+
+    private HandlerThread mThreadHandler;
+    private Button mButton;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         initView();
+        initData();
         initListener();
     }
 
+    /**
+     * 初始化View控件
+     */
     private void initView() {
         mTextureView = findViewById(R.id.textureView);
+        mButton = findViewById(R.id.btn_picture);
+    }
+
+    /**
+     * 初始化数据
+     */
+    private void initData() {
+        //  TODO:权限判断
+        //  requestCameraPermission()
+        mThreadHandler = new HandlerThread("CAMERA2");
+        mThreadHandler.start();
+        mHandler = new Handler(mThreadHandler.getLooper());
+    }
+
+    @Override
+    public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+        setupCamera();
+        openCamera();
+    }
+
+    @Override
+    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+
+    }
+
+    @Override
+    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+        return false;
+    }
+
+    @Override
+    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
     }
 
     private void initListener() {
+
         /**
          * 设置TextureView的回调监听
          */
-        mTextureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+        mTextureView.setSurfaceTextureListener(this);
+
+        /**
+         * 按钮点击事件响应
+         */
+        mButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-                setupCamera();
-                openCamera();
-            }
+            public void onClick(View v) {
+                try {
+                    //获取屏幕方向
+                    int rotation = getWindowManager().getDefaultDisplay().getRotation();
+                    //设置CaptureRequest输出到mImageReader
+                    //CaptureRequest添加imageReaderSurface，不加的话就会导致ImageReader的onImageAvailable()方法不会回调
+                    mPreviewBuilder.addTarget(mImageReader.getSurface());
+                    //设置拍照方向
+                    mPreviewBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATION.get(rotation));
+                    //聚焦
+                    mPreviewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                    //停止预览
+                    mPreviewSerssion.stopRepeating();
 
-            @Override
-            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-            }
-
-            @Override
-            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-                return false;
-            }
-
-            @Override
-            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
+                    //开始拍照，然后回调上面的接口重启预览
+                    //因为mPreviewBuilder设置ImageReader作为target，所以会自动回调ImageReader的onImageAvailable()方法保存图片
+                    mPreviewSerssion.capture(mPreviewBuilder.build(), mSessionCaptureCallback, null);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
     }
@@ -134,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
         //  第二个参数stateCallback为相机的状态回调接口
         //  第三个参数用来确定Callback在哪个线程执行，为null的话就在当前线程执行
         try {
-            cameraManager.openCamera(mCameraId, stateCallback, mHandler);
+            cameraManager.openCamera(mCameraId, stateCallback, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -167,6 +229,7 @@ public class MainActivity extends AppCompatActivity {
      * 开启预览界面:设置Surface把它与CaptureRequestBuilder对象关联，再设置会话开始捕获画面
      */
     private void startPreview() {
+        //获取预览界面
         SurfaceTexture mSurfaceTexture = mTextureView.getSurfaceTexture();
         //设置缓冲区大小
         mSurfaceTexture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
@@ -185,7 +248,7 @@ public class MainActivity extends AppCompatActivity {
             // 第一个参数是捕获数据的输出Surface列表，
             // 第二个参数是CameraCaptureSession的状态回调接口，当它创建好后会回调onConfigured方法，
             // 第三个参数用来确定Callback在哪个线程执行，为null的话就在当前线程执行
-            mCameraDevice.createCaptureSession(Arrays.asList(mSurface, imageReaderSurface), mSessionStateCallback, mHandler);
+            mCameraDevice.createCaptureSession(Arrays.asList(mSurface, imageReaderSurface), mSessionStateCallback, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -218,7 +281,7 @@ public class MainActivity extends AppCompatActivity {
             mPreviewSerssion = session;
             //设置反复捕获数据的请求，这样预览界面就会一直有数据传送显示
             try {
-                mPreviewSerssion.setRepeatingRequest(mCaptureRequest, mSessionCaptureCallback, null);
+                mPreviewSerssion.setRepeatingRequest(mCaptureRequest, mSessionCaptureCallback, mHandler);
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }
@@ -235,7 +298,8 @@ public class MainActivity extends AppCompatActivity {
      */
     private CameraCaptureSession.CaptureCallback mSessionCaptureCallback = new CameraCaptureSession.CaptureCallback() {
         @Override
-        public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+        public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request,
+                                       @NonNull TotalCaptureResult result) {
             super.onCaptureCompleted(session, request, result);
             //重启预览
             restartPreview();
@@ -248,7 +312,7 @@ public class MainActivity extends AppCompatActivity {
     private void restartPreview() {
         try {
             //执行setRepeatingRequest方法就行了，注意mCaptureRequest是之前开启预览设置的请求
-            mPreviewSerssion.setRepeatingRequest(mCaptureRequest, null, null);
+            mPreviewSerssion.setRepeatingRequest(mCaptureRequest, null, mHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }

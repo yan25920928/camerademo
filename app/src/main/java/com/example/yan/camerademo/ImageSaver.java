@@ -20,6 +20,7 @@ public class ImageSaver implements Runnable{
    private Image mImage;
    private File mFile;
    private Application mApplication;
+
    public ImageSaver(Image image, Application application){
        mImage = image;
        mApplication = application;
