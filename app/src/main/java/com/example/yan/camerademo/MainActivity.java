@@ -2,11 +2,7 @@ package com.example.yan.camerademo;
 
 
 import android.Manifest;
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
@@ -23,10 +19,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.app.Fragment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Size;
@@ -42,20 +35,23 @@ import java.util.Collections;
 import java.util.Comparator;
 
 
-public class MainActivity extends AppCompatActivity implements TextureView.SurfaceTextureListener,
-        ActivityCompat.OnRequestPermissionsResultCallback {
+public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback {
 
+    private HandlerThread mThreadHandler;
     private Handler mHandler = new Handler();
+
     private TextureView mTextureView;
+    private Button mButton;
+
     private String mCameraId;
     private CameraDevice mCameraDevice;
     private Size mPreviewSize;
     private ImageReader mImageReader;
     private CaptureRequest.Builder mPreviewBuilder;
-    private CameraCaptureSession mPreviewSerssion;
+    private CameraCaptureSession mPreviewSession;
     private CaptureRequest mCaptureRequest;
 
-    private static final int REQUEST_CAMERA_PERMISSION = 1;
+    public static final int REQUEST_CAMERA_PERMISSION = 1;
     private static final String FRAGMENT_DIALOG = "dialog";
     //方向取向
     private static final SparseIntArray ORIENTATION = new SparseIntArray();
@@ -67,13 +63,11 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         ORIENTATION.append(Surface.ROTATION_270, 180);
     }
 
-    private HandlerThread mThreadHandler;
-    private Button mButton;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        requestCameraPermission();
         initView();
         initData();
         initListener();
@@ -91,9 +85,6 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
      * 初始化数据
      */
     private void initData() {
-        // 权限判断
-        requestCameraPermission();
-
         mThreadHandler = new HandlerThread("CAMERA2");
         mThreadHandler.start();
         mHandler = new Handler(mThreadHandler.getLooper());
@@ -105,7 +96,7 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     private void requestCameraPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
-                new ConfirmationDialog().show(getSupportFragmentManager(), FRAGMENT_DIALOG);
+                new PermissionConfirmationDialog().show(getSupportFragmentManager(), FRAGMENT_DIALOG);
             } else {
                 requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
             }
@@ -132,99 +123,33 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         }
     }
 
-    /**
-     * 错误展示窗口
-     */
-    public static class ErrorDialog extends DialogFragment {
-        private static final String ARG_MESSAGE = "message";
-
-        public static ErrorDialog newInstance(String message) {
-            ErrorDialog dialog = new ErrorDialog();
-            Bundle args = new Bundle();
-            args.putString(ARG_MESSAGE, message);
-            dialog.setArguments(args);
-            return dialog;
-        }
-
-        @NonNull
-        @Override
-        public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-            final Activity activity = getActivity();
-            return new AlertDialog.Builder(activity).setMessage(getArguments().getString(ARG_MESSAGE))
-                    .setPositiveButton(android.R.string.ok,
-                            new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    activity.finish();
-                                }
-                            })
-                    .create();
-        }
-    }
-
-    /**
-     * 相机权限申请弹窗交互，OK/Cancel 点击监听事件
-     */
-    public static class ConfirmationDialog extends DialogFragment {
-        @NonNull
-        @Override
-        public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-            final Activity activity = getActivity();
-            new AlertDialog.Builder(getActivity()).setMessage(R.string.request_permission)
-                    .setPositiveButton(android.R.string.ok,
-                            new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                        activity.requestPermissions(new String[]{Manifest.permission.CAMERA},
-                                                REQUEST_CAMERA_PERMISSION);
-                                    }
-                                }
-                            })
-                    .setNegativeButton(android.R.string.cancel,
-                            new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    if (activity != null) {
-                                        activity.finish();
-                                    }
-                                }
-                            })
-                    .create();
-            return super.onCreateDialog(savedInstanceState);
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        //  设置TextureView的回调监听
-        mTextureView.setSurfaceTextureListener(this);
-    }
-
-    @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-        setupCamera();
-        openCamera();
-    }
-
-    @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-    }
-
-    @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        return false;
-    }
-
-    @Override
-    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-    }
-
     private void initListener() {
+
+        /**
+         * 预览界面数据传送监听回调
+         */
+        mTextureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+            @Override
+            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                setupCamera();
+                openCamera();
+            }
+
+            @Override
+            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+
+            }
+
+            @Override
+            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+                return false;
+            }
+
+            @Override
+            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
+            }
+        });
 
         /**
          * 按钮点击事件响应
@@ -243,11 +168,11 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
                     //聚焦
                     mPreviewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                     //停止预览
-                    mPreviewSerssion.stopRepeating();
+                    mPreviewSession.stopRepeating();
 
                     //开始拍照，然后回调上面的接口重启预览
                     //因为mPreviewBuilder设置ImageReader作为target，所以会自动回调ImageReader的onImageAvailable()方法保存图片
-                    mPreviewSerssion.capture(mPreviewBuilder.build(), mSessionCaptureCallback, null);
+                    mPreviewSession.capture(mPreviewBuilder.build(), mSessionCaptureCallback, null);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -389,10 +314,10 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         public void onConfigured(@NonNull CameraCaptureSession session) {
             //创建捕获请求
             mCaptureRequest = mPreviewBuilder.build();
-            mPreviewSerssion = session;
+            mPreviewSession = session;
             //设置反复捕获数据的请求，这样预览界面就会一直有数据传送显示
             try {
-                mPreviewSerssion.setRepeatingRequest(mCaptureRequest, mSessionCaptureCallback, mHandler);
+                mPreviewSession.setRepeatingRequest(mCaptureRequest, mSessionCaptureCallback, mHandler);
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }
@@ -423,7 +348,7 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     private void restartPreview() {
         try {
             //执行setRepeatingRequest方法就行了，注意mCaptureRequest是之前开启预览设置的请求
-            mPreviewSerssion.setRepeatingRequest(mCaptureRequest, null, mHandler);
+            mPreviewSession.setRepeatingRequest(mCaptureRequest, null, mHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }

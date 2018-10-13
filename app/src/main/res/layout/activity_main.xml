@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <!--纹理视图-->
+    <!--预览视图-->
     <TextureView
         android:id="@+id/textureView"
         android:layout_width="wrap_content"
@@ -13,6 +13,7 @@
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true" />
 
+    <!---->
     <FrameLayout
         android:id="@+id/fl_control"
         android:layout_width="match_parent"
