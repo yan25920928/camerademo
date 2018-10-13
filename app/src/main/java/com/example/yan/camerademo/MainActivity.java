@@ -29,6 +29,7 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Toast;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -63,6 +64,32 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         ORIENTATION.append(Surface.ROTATION_270, 180);
     }
 
+    /**
+     * 预览界面数据传送监听回调
+     */
+    private final TextureView.SurfaceTextureListener mSurfaceTextureListener = new TextureView.SurfaceTextureListener() {
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+            setupCamera();
+            openCamera();
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+
+        }
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+            return true;
+        }
+
+        @Override
+        public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -88,6 +115,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         mThreadHandler = new HandlerThread("CAMERA2");
         mThreadHandler.start();
         mHandler = new Handler(mThreadHandler.getLooper());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mTextureView.isAvailable()){
+            openCamera();
+        }else {
+            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
+        }
     }
 
     /**
@@ -124,33 +161,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     private void initListener() {
-
-        /**
-         * 预览界面数据传送监听回调
-         */
-        mTextureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
-            @Override
-            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-                setupCamera();
-                openCamera();
-            }
-
-            @Override
-            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-            }
-
-            @Override
-            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-                return false;
-            }
-
-            @Override
-            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-            }
-        });
-
         /**
          * 按钮点击事件响应
          */
