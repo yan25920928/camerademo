@@ -24,15 +24,15 @@
         android:padding="16dp">
 
         <!--照片预览-->
-        <Button
-            android:id="@+id/btn_picture_overview"
+        <ImageView
+            android:id="@+id/img_overview"
             style="@style/ButtonStyle"
             android:layout_gravity="left"
             android:background="@drawable/ic_photo_library_black_24dp" />
 
         <!--快门-->
         <Button
-            android:id="@+id/btn_picture"
+            android:id="@+id/btn_shoot"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_gravity="center"
@@ -40,7 +40,7 @@
 
         <!--镜头切换-->
         <Button
-            android:id="@+id/btn_facing_switch"
+            android:id="@+id/btn_switch"
             style="@style/ButtonStyle"
             android:layout_gravity="right"
             android:background="@drawable/ic_loop_black_24dp" />

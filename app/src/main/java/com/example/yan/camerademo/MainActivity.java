@@ -29,6 +29,7 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,8 +42,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private Handler mHandler = new Handler();
 
     private TextureView mTextureView;
-    private Button mButton;
-
+    private Button mBtnShoot;
+    private Button mBtnSwitch;
+    private ImageView mImageOverview;
     private String mCameraId;
     private CameraDevice mCameraDevice;
     private Size mPreviewSize;
@@ -69,7 +71,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private final TextureView.SurfaceTextureListener mSurfaceTextureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-            setupCamera();
+            setupCamera(CameraCharacteristics.LENS_FACING_BACK);
             openCamera();
         }
 
@@ -88,6 +90,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         }
     };
+    private CameraCharacteristics cameraCharacteristics;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -125,7 +129,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if (grantResults.length != 1 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
                 ErrorDialog.newInstance(getResources().getString(R.string.request_permission)).
-                        show(getSupportFragmentManager(),FRAGMENT_DIALOG);
+                        show(getSupportFragmentManager(), FRAGMENT_DIALOG);
             }
         } else {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -137,7 +141,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
      */
     private void initView() {
         mTextureView = findViewById(R.id.textureView);
-        mButton = findViewById(R.id.btn_picture);
+        mBtnShoot = findViewById(R.id.btn_shoot);
+        mBtnSwitch = findViewById(R.id.btn_switch);
+        mImageOverview = findViewById(R.id.img_overview);
     }
 
     /**
@@ -153,18 +159,17 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     protected void onResume() {
         super.onResume();
         //是否可渲染
-        if (mTextureView.isAvailable()){
+        if (mTextureView.isAvailable()) {
             openCamera();
-        }else {
+        } else {
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
     }
 
     private void initListener() {
-        /**
-         * 按钮点击事件响应
-         */
-        mButton.setOnClickListener(new View.OnClickListener() {
+
+        //  拍摄按钮点击事件响应
+        mBtnShoot.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 try {
@@ -188,27 +193,48 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
             }
         });
+
+        //  镜头切换按钮点击事件,获取当前使用的镜头
+        //  点击切换关闭之前已经打开的镜头和预览,启用指定的镜头
+        mBtnSwitch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // 当前镜头ID值
+                int facingId = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING);
+
+                //关闭相机
+                mCameraDevice.close();
+
+                if (facingId == CameraCharacteristics.LENS_FACING_BACK)
+                    setupCamera(CameraCharacteristics.LENS_FACING_FRONT);
+                else
+                    setupCamera(CameraCharacteristics.LENS_FACING_BACK);
+
+                //打开相机
+                openCamera();
+            }
+        });
     }
 
     /**
      * 设置默认启用后置摄像头，并且设置图像尺寸获取摄像头的ID
      * 通过CameraManager，遍历所有摄像头
-     * 根据摄像头特征，默认启用后置
+     * @param orientation 指定使用哪个摄像头
      */
-    private void setupCamera() {
+    private void setupCamera(int orientation) {
         //获取CameraManager
         CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
             //遍历所有摄像头
             for (String id : cameraManager.getCameraIdList()) {
                 //获取相机特征
-                CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(id);
+                cameraCharacteristics = cameraManager.getCameraCharacteristics(id);
                 //LENS_FACING_FRONT——前置，LENS_FACING_BACK——后置，LENS_FACING_EXTERNAL——外置
-                if (characteristics.get(CameraCharacteristics.LENS_FACING) != CameraCharacteristics.LENS_FACING_BACK)
-                    //非后置时，直接跳出循环
+                if (cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) != orientation)
+                    //非指定对应镜头时，直接跳出循环
                     continue;
                 //获取StreamConfigurationMap，它是管理摄像头支持的所有输出格式和尺寸
-                StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                StreamConfigurationMap map = cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                 // 设置预览静态图片，使用最大尺寸
                 mPreviewSize = Collections.max(Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
                         new Comparator<Size>() {
@@ -246,6 +272,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 关闭相机，释放资源
+     */
+    private void closeCamera() {
+
     }
 
     /**
@@ -341,7 +374,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     /**
      * CameraCaptureSession.CaptureCallback 设置预览完成的逻辑处理
-     *
      */
     private CameraCaptureSession.CaptureCallback mSessionCaptureCallback = new CameraCaptureSession.CaptureCallback() {
         @Override
