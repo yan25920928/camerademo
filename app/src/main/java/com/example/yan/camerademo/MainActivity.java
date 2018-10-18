@@ -29,7 +29,6 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Toast;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -101,33 +100,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     /**
-     * 初始化View控件
-     */
-    private void initView() {
-        mTextureView = findViewById(R.id.textureView);
-        mButton = findViewById(R.id.btn_picture);
-    }
-
-    /**
-     * 初始化数据
-     */
-    private void initData() {
-        mThreadHandler = new HandlerThread("CAMERA2");
-        mThreadHandler.start();
-        mHandler = new Handler(mThreadHandler.getLooper());
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (mTextureView.isAvailable()){
-            openCamera();
-        }else {
-            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
-        }
-    }
-
-    /**
      * 处理相机权限动态申请及结果回调
      */
     private void requestCameraPermission() {
@@ -157,6 +129,34 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         } else {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
+    }
+
+    /**
+     * 初始化View控件
+     */
+    private void initView() {
+        mTextureView = findViewById(R.id.textureView);
+        mButton = findViewById(R.id.btn_picture);
+    }
+
+    /**
+     * 初始化数据
+     */
+    private void initData() {
+        mThreadHandler = new HandlerThread("CAMERA2");
+        mThreadHandler.start();
+        mHandler = new Handler(mThreadHandler.getLooper());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        //是否可渲染
+        if (mTextureView.isAvailable()){
+            openCamera();
+        }else {
+            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
     }
 
@@ -341,6 +341,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     /**
      * CameraCaptureSession.CaptureCallback 设置预览完成的逻辑处理
+     *
      */
     private CameraCaptureSession.CaptureCallback mSessionCaptureCallback = new CameraCaptureSession.CaptureCallback() {
         @Override

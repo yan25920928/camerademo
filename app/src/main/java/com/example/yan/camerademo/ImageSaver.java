@@ -37,7 +37,7 @@ public class ImageSaver implements Runnable{
         FileOutputStream outputStream = null;
 
         //设置时间
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA);
 
         //设置名称
         String fname = "IMG"+sdf.format(new Date())+".jpg";
